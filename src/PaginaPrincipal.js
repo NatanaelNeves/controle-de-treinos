@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
-import { gerarMensagemVolume } from './utils/mensagensMotivacionais'; // Importe a nova função
+import { gerarMensagemVolume } from './utils/mensagensMotivacionais';
 
 // Imports do React-Bootstrap e Ícones
 import { Row, Col, Card, Button, Spinner, ListGroup, Badge, ProgressBar } from 'react-bootstrap';
@@ -69,12 +69,25 @@ const PaginaPrincipal = ({ usuario }) => {
         const sessao = docSessao.data();
         if (sessao.exerciciosPerformados && sessao.dataRealizacao) {
           sessao.exerciciosPerformados.forEach(exPerf => {
-            if (exPerf.exercicioBaseId === exercicioSelecionadoId && typeof exPerf.cargaUtilizadaKg === 'number' && exPerf.cargaUtilizadaKg > 0) {
-              performanceHistory.push({
-                data: new Date(sessao.dataRealizacao.seconds * 1000),
-                carga: exPerf.cargaUtilizadaKg,
-                reps: exPerf.repsMaxFeitas
-              });
+            if (exPerf.exercicioBaseId === exercicioSelecionadoId) {
+              if (exPerf.series && exPerf.series.length > 0) {
+                // Nova estrutura com múltiplas séries
+                const serieMaisPesada = exPerf.series.reduce((max, current) => (current.cargaKg > max.cargaKg ? current : max), {cargaKg: 0, reps: 0});
+                if(serieMaisPesada.cargaKg > 0) {
+                  performanceHistory.push({
+                    data: new Date(sessao.dataRealizacao.seconds * 1000),
+                    carga: serieMaisPesada.cargaKg,
+                    reps: serieMaisPesada.reps
+                  });
+                }
+              } else if (typeof exPerf.cargaUtilizadaKg === 'number' && exPerf.cargaUtilizadaKg > 0) {
+                // Fallback para a estrutura antiga (resumo)
+                performanceHistory.push({
+                  data: new Date(sessao.dataRealizacao.seconds * 1000),
+                  carga: exPerf.cargaUtilizadaKg,
+                  reps: exPerf.repsMaxFeitas
+                });
+              }
             }
           });
         }
@@ -119,7 +132,13 @@ const PaginaPrincipal = ({ usuario }) => {
         let volumeDaSessaoCalculado = 0;
         if (sessao.exerciciosPerformados) {
           sessao.exerciciosPerformados.forEach(exPerf => {
-            if (typeof exPerf.cargaUtilizadaKg === 'number' && typeof exPerf.repsMaxFeitas === 'number') {
+            if (exPerf.series && exPerf.series.length > 0) {
+              // Cálculo de volume para nova estrutura (múltiplas séries)
+              exPerf.series.forEach(serie => {
+                volumeDaSessaoCalculado += (serie.cargaKg || 0) * (serie.reps || 0);
+              });
+            } else if (typeof exPerf.cargaUtilizadaKg === 'number' && typeof exPerf.repsMaxFeitas === 'number') {
+              // Fallback para estrutura antiga (resumo)
               volumeDaSessaoCalculado += exPerf.cargaUtilizadaKg * exPerf.repsMaxFeitas;
             }
           });
@@ -242,7 +261,7 @@ const PaginaPrincipal = ({ usuario }) => {
               {exercicios.map(ex => (<option key={ex.id} value={ex.id}>{ex.nome}</option>))}
             </select>
           </div>
-          <div className="evolution-timeline">
+          <div className="evolution-timeline" style={{maxHeight: '400px', overflowY: 'auto', paddingRight: '10px'}}>
             {loadingEvolucao ? (<div className="text-center"><Spinner animation="border" size="sm" /></div>) : 
              (evolutionCardsData.length > 0 ? (
                 evolutionCardsData.map(treino => (
@@ -266,6 +285,7 @@ const PaginaPrincipal = ({ usuario }) => {
           </div>
         </Card.Body>
       </Card>
+      
       <Card data-bs-theme="dark" className="mt-4">
         <Card.Header as="h3" className="text-center">Resumo Semanal de Volume</Card.Header>
         <Card.Body>
@@ -280,7 +300,7 @@ const PaginaPrincipal = ({ usuario }) => {
                       <Card.Title as="h5" className="mb-0">{data.semana.replace('-W', ' - Semana ')}</Card.Title>
                       {data.diferenca !== 0 && (
                         <Badge bg={data.diferenca > 0 ? 'success-subtle' : 'danger-subtle'} text={data.diferenca > 0 ? 'success' : 'danger'} pill>
-                          {data.diferenca > 0 ? <FaArrowUp/> : <FaArrowDown/>} {data.diferenca.toFixed(0)} kg
+                          {data.diferenca > 0 ? <FaArrowUp/> : <FaArrowDown/>} {Math.round(data.diferenca)} kg
                         </Badge>
                       )}
                     </div>
