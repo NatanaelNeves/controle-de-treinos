@@ -3,11 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
-import Chart from 'react-apexcharts';
+import { gerarMensagemVolume } from './utils/mensagensMotivacionais'; // Importe a nova função
 
-// Imports do React-Bootstrap
-import { Row, Col, Card, Button, Spinner, ListGroup, Badge } from 'react-bootstrap';
-// Imports dos Ícones
+// Imports do React-Bootstrap e Ícones
+import { Row, Col, Card, Button, Spinner, ListGroup, Badge, ProgressBar } from 'react-bootstrap';
 import { FaArrowUp, FaArrowDown, FaMinus, FaTrophy } from 'react-icons/fa';
 
 const getYearWeek = (date) => {
@@ -23,11 +22,10 @@ const PaginaPrincipal = ({ usuario }) => {
   const [exercicios, setExercicios] = useState([]);
   const [exercicioSelecionadoId, setExercicioSelecionadoId] = useState('');
   
-  // Estado para o novo card de evolução
   const [evolutionCardsData, setEvolutionCardsData] = useState([]);
   const [loadingEvolucao, setLoadingEvolucao] = useState(true);
   
-  const [chartDataVolumeSemanal, setChartDataVolumeSemanal] = useState({ options: { chart: {id: 'grafico-volume-semanal'}}, series: [] });
+  const [volumeSemanalData, setVolumeSemanalData] = useState([]);
   const [loadingVolume, setLoadingVolume] = useState(true);
   
   const [totalSessoesMes, setTotalSessoesMes] = useState(0);
@@ -35,7 +33,7 @@ const PaginaPrincipal = ({ usuario }) => {
   const [recordesPessoais, setRecordesPessoais] = useState([]);
   const [loadingRecordes, setLoadingRecordes] = useState(true);
 
-  // Efeito para buscar a lista de exercícios base do usuário (para o dropdown)
+  // Efeito para buscar a lista de exercícios base do usuário
   useEffect(() => {
     if (!usuario) return;
     const q = query(collection(db, "exercicios"), where("userId", "==", usuario.uid), orderBy("nome", "asc"));
@@ -112,10 +110,13 @@ const PaginaPrincipal = ({ usuario }) => {
     const sessoesRef = collection(db, 'usuarios', usuario.uid, 'sessoesRegistradas');
     const qSessoes = query(sessoesRef, orderBy("dataRealizacao", "asc"));
     const unsubscribe = onSnapshot(qSessoes, (querySnapshot) => {
-      const volumesSemanais = {}; let sessoesNoMesAtual = 0;
+      const volumesSemanais = {}; 
+      let sessoesNoMesAtual = 0;
       const dataAtual = new Date(); const mesAtual = dataAtual.getMonth(); const anoAtual = dataAtual.getFullYear();
+
       querySnapshot.forEach((doc) => {
-        const sessao = doc.data(); let volumeDaSessaoCalculado = 0;
+        const sessao = doc.data();
+        let volumeDaSessaoCalculado = 0;
         if (sessao.exerciciosPerformados) {
           sessao.exerciciosPerformados.forEach(exPerf => {
             if (typeof exPerf.cargaUtilizadaKg === 'number' && typeof exPerf.repsMaxFeitas === 'number') {
@@ -130,25 +131,29 @@ const PaginaPrincipal = ({ usuario }) => {
         }
         if (sessao.dataRealizacao) {
             const dataDaSessao = sessao.dataRealizacao.toDate();
-            if (dataDaSessao.getMonth() === mesAtual && dataDaSessao.getFullYear() === anoAtual) { sessoesNoMesAtual++; }
+            if (dataDaSessao.getMonth() === mesAtual && dataDaSessao.getFullYear() === anoAtual) {
+                sessoesNoMesAtual++;
+            }
         }
       });
       setTotalSessoesMes(sessoesNoMesAtual);
-      const labelsVolume = Object.keys(volumesSemanais).sort();
-      const dataPointsVolume = labelsVolume.map(semana => volumesSemanais[semana]);
-      setChartDataVolumeSemanal({
-        series: [{ name: 'Volume Total', data: dataPointsVolume }],
-        options: { 
-            theme: { mode: 'dark', palette: 'palette2' },
-            chart: { id: 'grafico-volume-semanal-final', type: 'bar', height: 350, background: 'transparent' },
-            xaxis: { categories: labelsVolume, title: { text: 'Semana do Ano (Calendário)' } },
-            yaxis: { title: { text: 'Volume Total (Carga x Reps)' }, min: 0 },
-            title: { text: 'Volume Total de Treino por Semana (Calendário)', align: 'center' },
-            plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 5 } },
-            dataLabels: { enabled: false }, stroke: { show: true, width: 2, colors: ['transparent'] },
-            fill: { opacity: 1 }, tooltip: { theme: 'dark', y: { formatter: function (val) { return val ? val.toFixed(0) + " kg*reps" : "0 kg*reps"; } } },
-        }
+
+      const maxVolumeGlobal = Math.max(...Object.values(volumesSemanais), 0);
+      const semanasOrdenadas = Object.keys(volumesSemanais).sort();
+      const weeklyDataArray = semanasOrdenadas.map((semana, index) => {
+        const currentVolume = volumesSemanais[semana];
+        const previousWeekKey = index > 0 ? semanasOrdenadas[index - 1] : null;
+        const previousVolume = previousWeekKey ? volumesSemanais[previousWeekKey] : 0;
+        const diferenca = currentVolume - previousVolume;
+        return {
+          semana,
+          volume: currentVolume,
+          diferenca,
+          percentualMax: maxVolumeGlobal > 0 ? (currentVolume / maxVolumeGlobal) * 100 : 0,
+          mensagem: gerarMensagemVolume(currentVolume)
+        };
       });
+      setVolumeSemanalData(weeklyDataArray.reverse());
       setLoadingVolume(false);
     }, (error) => { setLoadingVolume(false); });
     return () => unsubscribe();
@@ -261,14 +266,39 @@ const PaginaPrincipal = ({ usuario }) => {
           </div>
         </Card.Body>
       </Card>
-      
-      <Card data-bs-theme="dark">
-        <Card.Header as="h3" className="text-center">Volume Total Semanal</Card.Header>
+      <Card data-bs-theme="dark" className="mt-4">
+        <Card.Header as="h3" className="text-center">Resumo Semanal de Volume</Card.Header>
         <Card.Body>
-          {loadingVolume ? (<p className="text-center text-muted">Carregando...</p>) : (
-            chartDataVolumeSemanal.series && chartDataVolumeSemanal.series.length > 0 && chartDataVolumeSemanal.series[0].data.length > 0 ?
-            <Chart options={chartDataVolumeSemanal.options} series={chartDataVolumeSemanal.series} type="bar" height={350}/>
-            : <p className="text-center text-muted">Sem dados de volume para exibir.</p>
+          {loadingVolume ? (
+            <div className="text-center"><Spinner animation="border" /></div>
+          ) : (
+            volumeSemanalData.length > 0 ? (
+              volumeSemanalData.map(data => (
+                <Card key={data.semana} className="mb-3 bg-dark-subtle">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <Card.Title as="h5" className="mb-0">{data.semana.replace('-W', ' - Semana ')}</Card.Title>
+                      {data.diferenca !== 0 && (
+                        <Badge bg={data.diferenca > 0 ? 'success-subtle' : 'danger-subtle'} text={data.diferenca > 0 ? 'success' : 'danger'} pill>
+                          {data.diferenca > 0 ? <FaArrowUp/> : <FaArrowDown/>} {data.diferenca.toFixed(0)} kg
+                        </Badge>
+                      )}
+                    </div>
+                    <ProgressBar 
+                      now={data.percentualMax} 
+                      label={`${Math.round(data.volume)} kg`} 
+                      variant="success"
+                      animated 
+                    />
+                    <Card.Text className="text-muted mt-2 text-center fst-italic">
+                      {data.mensagem}
+                    </Card.Text>
+                  </Card.Body>
+                </Card>
+              ))
+            ) : (
+              <p className="text-center text-muted">Sem dados de volume para exibir. Registre alguns treinos!</p>
+            )
           )}
         </Card.Body>
       </Card>
