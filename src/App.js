@@ -1,16 +1,27 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link as RouterLink } from 'react-router-dom'; // Renomeamos Link para RouterLink para evitar conflito
+import { BrowserRouter as Router, Routes, Route, Link as RouterLink } from 'react-router-dom';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
-// 1. IMPORTAR COMPONENTES DO REACT-BOOTSTRAP
+// Imports do React-Bootstrap
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
-import Button from 'react-bootstrap/Button'; // Para o botão de logout
+import Button from 'react-bootstrap/Button';
 
-// Nossos componentes de página (sem mudanças aqui)
+// Imports dos Ícones
+import { 
+  FaTachometerAlt,    // Ícone para Dashboard
+  FaDumbbell,         // Ícone para Exercícios e logo
+  FaClipboardList,    // Ícone para Planos
+  FaCalendarAlt,      // Ícone para Histórico
+  FaSignOutAlt,       // Ícone para Sair
+  FaUserPlus,         // Ícone para Cadastrar
+  FaSignInAlt         // Ícone para Login
+} from 'react-icons/fa';
+
+// Nossos componentes de página
 import PaginaCadastro from './PaginaCadastro';
 import PaginaLogin from './PaginaLogin';
 import PaginaPrincipal from './PaginaPrincipal';
@@ -35,40 +46,55 @@ function App() {
   const handleLogout = async () => {
     await signOut(auth);
     alert("Logout efetuado com sucesso!");
-    // Idealmente, aqui você também redirecionaria para a página de login:
-    // navigate('/login'); // Se você tiver 'navigate' disponível aqui
+    // O redirecionamento já acontece naturalmente porque o estado 'usuario' mudará para null
   };
 
   return (
     <Router>
-      {/* 2. SUBSTITUIR A BARRA DE NAVEGAÇÃO ANTIGA PELA DO REACT-BOOTSTRAP */}
-      <Navbar bg="dark" variant="dark" expand="lg" sticky="top">
-        <Container>
-          <Navbar.Brand as={RouterLink} to="/">🏋️‍♂️ FitTrack Pro</Navbar.Brand>
+      <Navbar bg="dark" variant="dark" expand="lg" sticky="top" className="shadow-sm">
+        <Container fluid>
+          <Navbar.Brand as={RouterLink} to="/">
+            <FaDumbbell className="me-2"/>
+            FitTrack Pro
+          </Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
-              <Nav.Link as={RouterLink} to="/">Dashboard</Nav.Link>
+              <Nav.Link as={RouterLink} to="/">
+                <FaTachometerAlt className="me-2" />Dashboard
+              </Nav.Link>
               {usuario && (
                 <>
-                  <Nav.Link as={RouterLink} to="/exercicios">Meus Exercícios</Nav.Link>
-                  <Nav.Link as={RouterLink} to="/meus-planos">Meus Planos</Nav.Link>
-                  <Nav.Link as={RouterLink} to="/historico">Histórico</Nav.Link>
+                  <Nav.Link as={RouterLink} to="/exercicios">
+                    <FaDumbbell className="me-2" />Meus Exercícios
+                  </Nav.Link>
+                  <Nav.Link as={RouterLink} to="/meus-planos">
+                    <FaClipboardList className="me-2" />Meus Planos
+                  </Nav.Link>
+                  <Nav.Link as={RouterLink} to="/historico">
+                    <FaCalendarAlt className="me-2" />Histórico
+                  </Nav.Link>
                 </>
               )}
             </Nav>
             <Nav>
               {usuario ? (
                 <>
-                  <Navbar.Text className="me-2">
+                  <Navbar.Text className="me-3 d-none d-lg-block"> {/* Esconde em telas pequenas para não quebrar o layout */}
                     Olá, {usuario.email}!
                   </Navbar.Text>
-                  <Button variant="outline-light" size="sm" onClick={handleLogout}>Sair</Button>
+                  <Button variant="outline-danger" size="sm" onClick={handleLogout}>
+                    <FaSignOutAlt className="me-1" /> Sair
+                  </Button>
                 </>
               ) : (
                 <>
-                  <Nav.Link as={RouterLink} to="/cadastro">Cadastrar</Nav.Link>
-                  <Nav.Link as={RouterLink} to="/login">Login</Nav.Link>
+                  <Nav.Link as={RouterLink} to="/cadastro">
+                    <FaUserPlus className="me-2" />Cadastrar
+                  </Nav.Link>
+                  <Nav.Link as={RouterLink} to="/login">
+                    <FaSignInAlt className="me-2" />Login
+                  </Nav.Link>
                 </>
               )}
             </Nav>
@@ -76,8 +102,7 @@ function App() {
         </Container>
       </Navbar>
 
-      {/* O conteúdo principal da página terá um padding para não ficar colado na navbar (opcional) */}
-      <Container className="mt-4 mb-4"> {/* mt-4 adiciona margem no topo */}
+      <Container className="mt-4 mb-4">
         <Routes>
           <Route path="/cadastro" element={<PaginaCadastro />} />
           <Route path="/login" element={<PaginaLogin />} />
@@ -100,11 +125,11 @@ function App() {
           />
           <Route 
             path="/meus-planos/:planoId" 
-            element={<RotaProtegida usuario={usuario}><PaginaDetalhesPlano /></RotaProtegida>}
+            element={<RotaProtegida usuario={usuario}><PaginaDetalhesPlano usuario={usuario} /></RotaProtegida>}
           />
           <Route 
             path="/meus-planos/:planoId/grupos/:grupoId/exercicios"
-            element={<RotaProtegida usuario={usuario}><PaginaGerenciarExerciciosGrupo /></RotaProtegida>}
+            element={<RotaProtegida usuario={usuario}><PaginaGerenciarExerciciosGrupo usuario={usuario} /></RotaProtegida>}
           />
           <Route 
             path="/" 

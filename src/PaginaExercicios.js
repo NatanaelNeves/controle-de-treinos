@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { 
     collection, addDoc, onSnapshot, query, where, doc, deleteDoc, updateDoc, orderBy 
-} from 'firebase/firestore'; // Adicionado orderBy
+} from 'firebase/firestore';
 
 // Imports do React-Bootstrap
 import Row from 'react-bootstrap/Row';
@@ -26,7 +26,7 @@ const PaginaExercicios = ({ usuario }) => {
   const [novoNome, setNovoNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Buscar os exercícios
+  // Buscar os exercícios (a lógica não muda)
   useEffect(() => {
     if (!usuario) {
       setExercicios([]);
@@ -34,7 +34,6 @@ const PaginaExercicios = ({ usuario }) => {
       return;
     }
     setLoading(true);
-    // Adicionado orderBy para ordenar a lista por nome
     const q = query(collection(db, "exercicios"), where("userId", "==", usuario.uid), orderBy("nome", "asc"));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const exerciciosDoUsuario = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -47,7 +46,7 @@ const PaginaExercicios = ({ usuario }) => {
     return () => unsubscribe();
   }, [usuario]);
 
-  // Adicionar um exercício
+  // Adicionar, Deletar, Atualizar (a lógica não muda)
   const handleAddExercicio = async (e) => {
     e.preventDefault();
     if (!nome.trim() || !usuario) return;
@@ -60,15 +59,14 @@ const PaginaExercicios = ({ usuario }) => {
         userId: usuario.uid,
       });
       setNome('');
-      setGrupoMuscular('Peito'); // Reseta para o padrão
-      setTipo('Composto');      // Reseta para o padrão
+      setGrupoMuscular('Peito');
+      setTipo('Composto');
     } catch (error) {
       console.error("Erro ao adicionar exercício: ", error);
     }
     setIsSubmitting(false);
   };
 
-  // Deletar um exercício
   const handleDeleteExercicio = async (id) => {
     if (window.confirm("Tem certeza que deseja deletar este exercício?")) {
       try {
@@ -79,7 +77,6 @@ const PaginaExercicios = ({ usuario }) => {
     }
   };
 
-  // Atualizar um exercício
   const handleUpdateExercicio = async (id) => {
     if (!novoNome.trim()) return;
     try {
@@ -104,10 +101,10 @@ const PaginaExercicios = ({ usuario }) => {
               <Form onSubmit={handleAddExercicio}>
                 <Form.Group className="mb-3" controlId="nomeExercicio">
                   <Form.Label>Nome do Exercício</Form.Label>
-                  <Form.Control type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Supino Reto" required />
+                  <Form.Control type="text" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Supino Reto com Barra" required />
                 </Form.Group>
                 <Form.Group className="mb-3" controlId="grupoMuscular">
-                  <Form.Label>Grupo Muscular</Form.Label>
+                  <Form.Label>Grupo Muscular Principal</Form.Label>
                   <Form.Select value={grupoMuscular} onChange={(e) => setGrupoMuscular(e.target.value)}>
                     <option value="Peito">Peito</option>
                     <option value="Costas">Costas</option>
@@ -116,20 +113,22 @@ const PaginaExercicios = ({ usuario }) => {
                     <option value="Bíceps">Bíceps</option>
                     <option value="Tríceps">Tríceps</option>
                     <option value="Abdômen">Abdômen</option>
+                    <option value="Outro">Outro</option>
                   </Form.Select>
                 </Form.Group>
                 <Form.Group className="mb-3" controlId="tipoExercicio">
-                  <Form.Label>Tipo</Form.Label>
+                  <Form.Label>Tipo de Exercício</Form.Label>
                   <Form.Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
                     <option value="Composto">Composto</option>
                     <option value="Isolado">Isolado</option>
                     <option value="Máquina">Máquina</option>
                     <option value="Livre">Livre</option>
+                    <option value="Cardio">Cardio</option>
                   </Form.Select>
                 </Form.Group>
                 <div className="d-grid">
                   <Button variant="primary" type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? <Spinner as="span" size="sm" /> : 'Adicionar'}
+                    {isSubmitting ? <Spinner as="span" size="sm" /> : 'Adicionar Exercício'}
                   </Button>
                 </div>
               </Form>
@@ -151,7 +150,6 @@ const PaginaExercicios = ({ usuario }) => {
                   {exercicios.map(ex => (
                     <ListGroup.Item key={ex.id}>
                       {editandoEx === ex.id ? (
-                        // Modo de Edição
                         <InputGroup>
                           <Form.Control 
                             type="text" 
@@ -163,7 +161,6 @@ const PaginaExercicios = ({ usuario }) => {
                           <Button variant="outline-secondary" onClick={() => setEditandoEx(null)}>Cancelar</Button>
                         </InputGroup>
                       ) : (
-                        // Modo de Visualização Normal
                         <div className="d-flex justify-content-between align-items-center">
                           <div>
                             <div className="fw-bold">{ex.nome}</div>
