@@ -1,12 +1,93 @@
+/* src/index.css */
+
+/* 1. Importar as fontes que você sugeriu (Poppins e Montserrat) do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/*
+  O TailwindCSS usa algumas variáveis CSS para um "preflight" (reset).
+  Se você removeu completamente o Tailwind (incluindo as diretivas @tailwind do index.css),
+  pode ignorar esta parte. Se ainda tiver resquícios ou quiser um reset mais moderno,
+  pode manter algo similar ao que o Tailwind faria, ou usar o reset do Bootstrap.
+  O próprio Bootstrap já inclui o "Reboot" que é o seu normalizador.
+*/
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  /* Define Poppins como a fonte principal, com fallbacks */
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* ===== INÍCIO DO TEMA ESCURO BASE ===== */
+  background-color: #1a202c; /* Um cinza bem escuro, quase preto (Ex: Tailwind's gray-800/900) */
+  color: #e2e8f0;           /* Um cinza bem claro para o texto principal (Ex: Tailwind's gray-200/300) */
+  /* ===== FIM DO TEMA ESCURO BASE ===== */
 }
 
+/* Para que títulos usem Montserrat, se desejar, ou defina nos componentes */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+  /* O Bootstrap pode definir cores escuras para títulos, então podemos ajustar para o tema escuro */
+  /* color: #f7fafc; /* Um branco/cinza muito claro para títulos no dark mode */
+}
+
+/*
+  Ajustes para componentes Bootstrap no Tema Escuro.
+  O Bootstrap 5 tem melhor suporte nativo a temas escuros (`data-bs-theme="dark"` no <html>),
+  mas como estamos usando a folha de estilo padrão, algumas classes podem precisar de um empurrãozinho
+  ou podemos usar as classes de utilidade do Bootstrap para cores de texto/fundo nos componentes.
+*/
+
+/* Ajuste para os Cards do React-Bootstrap terem um fundo que combine com o tema escuro */
+.card {
+  background-color: #2d3748; /* Um cinza mais escuro para o card (Ex: Tailwind's gray-700/800) */
+  border-color: #4a5568;   /* Uma borda sutil (Ex: Tailwind's gray-600) */
+  /* O texto dentro do card herdará a cor do body ou pode ser definido especificamente */
+}
+
+/* Garante que o texto padrão dentro do card e os títulos sejam claros */
+.card-title, .card-subtitle, .card-text {
+  color: #e2e8f0; /* Cor clara para texto do card */
+}
+
+/* Se você usar a classe .text-muted do Bootstrap, ela pode ficar muito escura. Ajuste: */
+.text-muted {
+  color: #a0aec0 !important; /* Um cinza mais claro para texto "muted" (Ex: Tailwind's gray-400/500) */
+}
+
+/* Ajuste para links padrão, se necessário (Bootstrap já tem estilos para isso) */
+a {
+  color: #63b3ed; /* Um azul claro para links (Ex: Tailwind's blue-400) */
+}
+a:hover {
+  color: #90cdf4; /* Um azul um pouco mais claro no hover (Ex: Tailwind's blue-300) */
+}
+
+/* O botão Primary do Bootstrap é azul. No tema escuro, ele já deve ter um bom contraste.
+   Se precisar ajustar botões específicos, é melhor usar as props 'variant' do React-Bootstrap
+   ou classes utilitárias diretamente nos botões. */
+
+/* Inputs e Selects: Bootstrap 5 lida bem com eles, mas se precisar de ajustes: */
+.form-control, .form-select {
+   background-color: #2d3748; /* Fundo escuro para inputs */
+   color: #e2e8f0; /* Texto claro para inputs */
+   border-color: #4a5568; /* Borda para inputs */
+}
+.form-control:focus, .form-select:focus {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  border-color: #63b3ed; /* Cor de destaque no foco */
+  box-shadow: 0 0 0 0.25rem rgba(99, 179, 237, 0.25); /* Sombra no foco */
+}
+/* Para a seta do select no tema escuro */
+.form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23e2e8f0' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+
+
+/* Você pode adicionar mais estilos globais aqui conforme a necessidade */
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
