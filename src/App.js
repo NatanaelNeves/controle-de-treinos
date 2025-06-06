@@ -1,24 +1,24 @@
 // src/App.js
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link as RouterLink } from 'react-router-dom';
 import { auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { ToastProvider, useToast } from './context/ToastContext';
 
 // Imports do React-Bootstrap
-import Container from 'react-bootstrap/Container';
-import Nav from 'react-bootstrap/Nav';
-import Navbar from 'react-bootstrap/Navbar';
-import Button from 'react-bootstrap/Button';
+import { Container, Nav, Navbar, Button, Spinner } from 'react-bootstrap';
 
 // Imports dos Ícones
 import { 
-  FaTachometerAlt,    // Ícone para Dashboard
-  FaDumbbell,         // Ícone para Exercícios e logo
-  FaClipboardList,    // Ícone para Planos
-  FaCalendarAlt,      // Ícone para Histórico
-  FaSignOutAlt,       // Ícone para Sair
-  FaUserPlus,         // Ícone para Cadastrar
-  FaSignInAlt         // Ícone para Login
+  FaTachometerAlt, 
+  FaDumbbell, 
+  FaClipboardList, 
+  FaCalendarAlt, 
+  FaSignOutAlt, 
+  FaUserPlus, 
+  FaSignInAlt,
+  FaTrophy 
 } from 'react-icons/fa';
 
 // Nossos componentes de página
@@ -31,22 +31,30 @@ import PaginaHistorico from './PaginaHistorico';
 import PaginaMeusPlanos from './PaginaMeusPlanos';
 import PaginaDetalhesPlano from './PaginaDetalhesPlano';
 import PaginaGerenciarExerciciosGrupo from './PaginaGerenciarExerciciosGrupo';
+import PaginaMeusRecordes from './PaginaMeusRecordes';
 import RotaProtegida from './RotaProtegida';
 
-function App() {
+// Componente interno para gerenciar o conteúdo que precisa de acesso aos contextos
+function AppContent() {
   const [usuario, setUsuario] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUsuario(user);
+      setAuthLoading(false); // A verificação inicial terminou
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    alert("Logout efetuado com sucesso!");
-    // O redirecionamento já acontece naturalmente porque o estado 'usuario' mudará para null
+    try {
+      await signOut(auth);
+      showToast('Logout efetuado com sucesso!', 'info');
+    } catch (error) {
+      showToast('Erro ao fazer logout.', 'danger');
+    }
   };
 
   return (
@@ -54,33 +62,25 @@ function App() {
       <Navbar bg="dark" variant="dark" expand="lg" sticky="top" className="shadow-sm">
         <Container fluid>
           <Navbar.Brand as={RouterLink} to="/">
-            <FaDumbbell className="me-2"/>
-            FitTrack Pro
+            <FaDumbbell className="me-2"/>FitTrack Pro
           </Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
-              <Nav.Link as={RouterLink} to="/">
-                <FaTachometerAlt className="me-2" />Dashboard
-              </Nav.Link>
+              <Nav.Link as={RouterLink} to="/"><FaTachometerAlt className="me-2" />Dashboard</Nav.Link>
               {usuario && (
                 <>
-                  <Nav.Link as={RouterLink} to="/exercicios">
-                    <FaDumbbell className="me-2" />Meus Exercícios
-                  </Nav.Link>
-                  <Nav.Link as={RouterLink} to="/meus-planos">
-                    <FaClipboardList className="me-2" />Meus Planos
-                  </Nav.Link>
-                  <Nav.Link as={RouterLink} to="/historico">
-                    <FaCalendarAlt className="me-2" />Histórico
-                  </Nav.Link>
+                  <Nav.Link as={RouterLink} to="/exercicios"><FaDumbbell className="me-2" />Meus Exercícios</Nav.Link>
+                  <Nav.Link as={RouterLink} to="/meus-planos"><FaClipboardList className="me-2" />Meus Planos</Nav.Link>
+                  <Nav.Link as={RouterLink} to="/historico"><FaCalendarAlt className="me-2" />Histórico</Nav.Link>
+                  <Nav.Link as={RouterLink} to="/meus-recordes"><FaTrophy className="me-2" />Meus Recordes</Nav.Link>
                 </>
               )}
             </Nav>
             <Nav>
               {usuario ? (
                 <>
-                  <Navbar.Text className="me-3 d-none d-lg-block"> {/* Esconde em telas pequenas para não quebrar o layout */}
+                  <Navbar.Text className="me-3 d-none d-lg-block">
                     Olá, {usuario.email}!
                   </Navbar.Text>
                   <Button variant="outline-danger" size="sm" onClick={handleLogout}>
@@ -88,14 +88,12 @@ function App() {
                   </Button>
                 </>
               ) : (
-                <>
-                  <Nav.Link as={RouterLink} to="/cadastro">
-                    <FaUserPlus className="me-2" />Cadastrar
-                  </Nav.Link>
-                  <Nav.Link as={RouterLink} to="/login">
-                    <FaSignInAlt className="me-2" />Login
-                  </Nav.Link>
-                </>
+                !authLoading && ( // Só mostra os botões de Login/Cadastro quando o loading da auth terminar
+                  <>
+                    <Nav.Link as={RouterLink} to="/cadastro"><FaUserPlus className="me-2" />Cadastrar</Nav.Link>
+                    <Nav.Link as={RouterLink} to="/login"><FaSignInAlt className="me-2" />Login</Nav.Link>
+                  </>
+                )
               )}
             </Nav>
           </Navbar.Collapse>
@@ -107,37 +105,26 @@ function App() {
           <Route path="/cadastro" element={<PaginaCadastro />} />
           <Route path="/login" element={<PaginaLogin />} />
           
-          <Route 
-            path="/exercicios" 
-            element={<RotaProtegida usuario={usuario}><PaginaExercicios usuario={usuario} /></RotaProtegida>} 
-          />
-          <Route 
-            path="/registrar-progresso"
-            element={<RotaProtegida usuario={usuario}><PaginaRegistrarProgresso usuario={usuario} /></RotaProtegida>}
-          />
-          <Route 
-            path="/historico"
-            element={<RotaProtegida usuario={usuario}><PaginaHistorico usuario={usuario} /></RotaProtegida>}
-          />
-          <Route 
-            path="/meus-planos"
-            element={<RotaProtegida usuario={usuario}><PaginaMeusPlanos usuario={usuario} /></RotaProtegida>}
-          />
-          <Route 
-            path="/meus-planos/:planoId" 
-            element={<RotaProtegida usuario={usuario}><PaginaDetalhesPlano usuario={usuario} /></RotaProtegida>}
-          />
-          <Route 
-            path="/meus-planos/:planoId/grupos/:grupoId/exercicios"
-            element={<RotaProtegida usuario={usuario}><PaginaGerenciarExerciciosGrupo usuario={usuario} /></RotaProtegida>}
-          />
-          <Route 
-            path="/" 
-            element={<RotaProtegida usuario={usuario}><PaginaPrincipal /></RotaProtegida>} 
-          />
+          <Route path="/exercicios" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaExercicios /></RotaProtegida>} />
+          <Route path="/registrar-progresso" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaRegistrarProgresso /></RotaProtegida>} />
+          <Route path="/historico" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaHistorico /></RotaProtegida>} />
+          <Route path="/meus-planos" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaMeusPlanos /></RotaProtegida>} />
+          <Route path="/meus-recordes" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaMeusRecordes /></RotaProtegida>} />
+          <Route path="/meus-planos/:planoId" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaDetalhesPlano /></RotaProtegida>} />
+          <Route path="/meus-planos/:planoId/grupos/:grupoId/exercicios" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaGerenciarExerciciosGrupo /></RotaProtegida>} />
+          <Route path="/" element={<RotaProtegida usuario={usuario} authLoading={authLoading}><PaginaPrincipal /></RotaProtegida>} />
         </Routes>
       </Container>
     </Router>
+  );
+}
+
+// O componente App principal agora só provê o contexto e renderiza o AppContent
+function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 

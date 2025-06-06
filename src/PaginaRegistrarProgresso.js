@@ -3,32 +3,33 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { 
-    collection, query, where, getDocs, orderBy, doc, onSnapshot, addDoc, serverTimestamp, setDoc, getDoc, arrayUnion, arrayRemove,
-    updateDoc // <<< 1. 'updateDoc' ADICIONADO AQUI
+    collection, query, where, getDocs, orderBy, doc, onSnapshot, addDoc, serverTimestamp, setDoc, getDoc, arrayUnion, arrayRemove, updateDoc
 } from 'firebase/firestore';
 import { gerarMensagemEngracada } from './utils/mensagensMotivacionais';
-// 2. 'Container' ADICIONADO AQUI
 import { Form, Button, Row, Col, Card, Spinner, Alert, InputGroup, Container } from 'react-bootstrap';
+import TimerDescanso from './components/TimerDescanso';
+import { useToast } from './context/ToastContext'; // 1. IMPORTAR O HOOK useToast
 
 const PaginaRegistrarProgresso = ({ usuario }) => {
+  const { showToast } = useToast(); // 2. PEGAR A FUNÇÃO showToast
+  const navigate = useNavigate();
+
   const [planoAtivoInfo, setPlanoAtivoInfo] = useState(null);
   const [semanaCicloSelecionada, setSemanaCicloSelecionada] = useState(1);
   const [gruposDoPlano, setGruposDoPlano] = useState([]);
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState('');
+  
   const [exerciciosPrescritos, setExerciciosPrescritos] = useState([]);
   const [dadosPerformados, setDadosPerformados] = useState({});
   const [observacaoGeralSessao, setObservacaoGeralSessao] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [loadingExercicios, setLoadingExercicios] = useState(false);
   const [isSubmittingSessao, setIsSubmittingSessao] = useState(false);
-  const navigate = useNavigate();
 
   // Efeito principal para carregar dados do plano e grupos
   useEffect(() => {
-    if (!usuario) {
-      setLoading(false);
-      return;
-    }
+    if (!usuario) { setLoading(false); return; }
     setLoading(true);
     const carregarDadosIniciais = async () => {
       try {
@@ -36,9 +37,7 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         const qPlanos = query(planosRef, where("ativo", "==", true));
         const planosSnapshot = await getDocs(qPlanos);
         if (planosSnapshot.empty) {
-          setPlanoAtivoInfo(null);
-          setLoading(false);
-          return;
+          setPlanoAtivoInfo(null); setLoading(false); return;
         }
         const planoAtivoDoc = planosSnapshot.docs[0];
         const planoData = planoAtivoDoc.data();
@@ -65,15 +64,16 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         }
       } catch (error) {
         console.error("Erro ao carregar dados da página:", error);
+        showToast("Erro ao carregar dados do plano.", 'danger');
         setPlanoAtivoInfo(null);
       } finally {
         setLoading(false);
       }
     };
     carregarDadosIniciais();
-  }, [usuario]);
+  }, [usuario, showToast]);
 
-  // Efeito para buscar exercícios prescritos
+  // Efeito para buscar exercícios e inicializar estado para MÚLTIPLAS SÉRIES
   useEffect(() => {
     if (!usuario || !planoAtivoInfo?.id || !grupoSelecionadoId) {
       setExerciciosPrescritos([]); setDadosPerformados({}); return;
@@ -86,30 +86,34 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
             setExerciciosPrescritos(prescritos);
             const perfData = {};
             prescritos.forEach(ex => {
-            const key = ex.prescricaoId || ex.exercicioBaseId; 
-            perfData[key] = {
-                exercicioBaseId: ex.exercicioBaseId, nomeExercicioSnapshot: ex.nomeExercicioSnapshot,
-                seriesAlvo: ex.seriesAlvo, repsAlvo: ex.repsAlvo,
-                observacaoGeralExercicio: '',
-                checkRealizado: true,
-                series: [{ setNumero: 1, cargaKg: '', reps: '', obsSet: '' }] 
-            };
+              const key = ex.prescricaoId || ex.exercicioBaseId; 
+              perfData[key] = {
+                  exercicioBaseId: ex.exercicioBaseId, nomeExercicioSnapshot: ex.nomeExercicioSnapshot,
+                  seriesAlvo: ex.seriesAlvo, repsAlvo: ex.repsAlvo,
+                  observacaoGeralExercicio: '',
+                  checkRealizado: true,
+                  series: [{ setNumero: 1, cargaKg: '', reps: '', obsSet: '' }] 
+              };
             });
             setDadosPerformados(perfData);
         } else {
             setExerciciosPrescritos([]); setDadosPerformados({});
         }
         setLoadingExercicios(false);
-    }, (error) => { setLoadingExercicios(false); });
+    }, (error) => {
+        console.error("Erro ao buscar exercícios do grupo:", error);
+        showToast("Erro ao carregar exercícios do grupo.", 'danger');
+        setLoadingExercicios(false);
+    });
     return () => unsubscribe;
-  }, [usuario, planoAtivoInfo, grupoSelecionadoId]);
+  }, [usuario, planoAtivoInfo, grupoSelecionadoId, showToast]);
 
   const handleSetInputChange = (keyId, setIndex, campo, valor) => {
     const novosDados = { ...dadosPerformados };
     novosDados[keyId].series[setIndex][campo] = valor;
     setDadosPerformados(novosDados);
   };
-
+  
   const handleExercicioInputChange = (keyId, campo, valor) => {
      setDadosPerformados(prev => ({ ...prev, [keyId]: { ...prev[keyId], [campo]: valor } }));
   };
@@ -136,18 +140,18 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
       novosDados[keyId].series = novasSeries.map((s, index) => ({ ...s, setNumero: index + 1 }));
       setDadosPerformados(novosDados);
     } else {
-      alert("É necessário registrar pelo menos uma série.");
+      showToast("É necessário registrar pelo menos uma série.", 'warning'); // ALERTA SUBSTITUÍDO
     }
   };
 
-  // Função para salvar a sessão
   const handleSalvarSessao = async (e) => {
     e.preventDefault();
     if (!usuario || !planoAtivoInfo || !grupoSelecionadoId || Object.keys(dadosPerformados).length === 0) {
-      alert("Informações da sessão incompletas."); return;
+      showToast("Informações da sessão incompletas.", 'danger'); return;
     }
     setIsSubmittingSessao(true);
     let maiorCargaNaSessao = 0;
+
     const exerciciosPerformadosParaSalvar = Object.values(dadosPerformados)
         .filter(item => item.checkRealizado && item.series.some(s => s.cargaKg && s.reps)) 
         .map(item => {
@@ -164,38 +168,36 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
                 checkRealizado: item.checkRealizado, observacaoGeralExercicio: item.observacaoGeralExercicio || '',
                 series: seriesValidas
             };
-    }).filter(item => item.series.length > 0); // Garante que só salvamos exercícios que tiveram séries válidas
+    }).filter(item => item.series.length > 0);
 
     if (exerciciosPerformadosParaSalvar.length === 0) {
-        alert("Nenhum exercício foi marcado como realizado ou teve séries válidas preenchidas."); setIsSubmittingSessao(false); return;
+        showToast("Nenhum exercício foi marcado como realizado ou teve séries válidas preenchidas.", 'warning'); 
+        setIsSubmittingSessao(false); return;
     }
     try {
-        const nomeDoGrupoAtual = gruposDoPlano.find(g=>g.id === grupoSelecionadoId)?.nomeAmigavelGrupo || 'Desconhecido';
+        const nomeDoGrupoAtual = gruposDoPlano.find(g=>g.id === grupoSelecionadoId)?.nomeAmigavelGrupo || 'Grupo Desconhecido';
         const faseAtualDoPlano = planoAtivoInfo.fasesDoPlano?.find(f => semanaCicloSelecionada >= f.semanaInicio && semanaCicloSelecionada <= f.semanaFim)?.nomeFase || 'Fase não definida';
         const novaSessaoRef = await addDoc(collection(db, 'usuarios', usuario.uid, 'sessoesRegistradas'), {
             planoId: planoAtivoInfo.id, grupoTreinoId: grupoSelecionadoId, nomeGrupoSnapshot: nomeDoGrupoAtual,
             dataRealizacao: serverTimestamp(), semanaCiclo: semanaCicloSelecionada, faseCicloSnapshot: faseAtualDoPlano,
             exerciciosPerformados: exerciciosPerformadosParaSalvar, observacaoGeralSessao: observacaoGeralSessao
         });
+        
         let prMessages = [];
         for (const exPerfSalvo of exerciciosPerformadosParaSalvar) {
             const prRef = doc(db, 'usuarios', usuario.uid, 'recordesPessoais', exPerfSalvo.exercicioBaseId);
             const prDoc = await getDoc(prRef); const prData = prDoc.exists() ? prDoc.data() : { maiorCargaKg: 0, recordesPorCarga: [] };
             let novoPrDeCarga = false;
-            let cargaMaximaDoExercicioNaSessao = 0;
             exPerfSalvo.series.forEach(serie => {
                 if (serie.cargaKg > prData.maiorCargaKg) {
                     prData.maiorCargaKg = serie.cargaKg; novoPrDeCarga = true;
-                }
-                if (serie.cargaKg > cargaMaximaDoExercicioNaSessao) {
-                    cargaMaximaDoExercicioNaSessao = serie.cargaKg;
                 }
                 const recordeParaCargaAtual = prData.recordesPorCarga.find(r => r.cargaKg === serie.cargaKg);
                 const repsAnteriores = recordeParaCargaAtual ? recordeParaCargaAtual.reps : 0;
                 if (serie.reps > repsAnteriores) {
                     prMessages.push(`NOVO PR de Reps para ${serie.cargaKg}kg em ${exPerfSalvo.nomeExercicioSnapshot}: ${serie.reps} reps! 🔥`);
                     const novosRecordesPorCarga = prData.recordesPorCarga.filter(r => r.cargaKg !== serie.cargaKg);
-                    novosRecordesPorCarga.push({ cargaKg: serie.cargaKg, reps: serie.reps, data: new Date(), sessaoId: novaSessaoRef.id, });
+                    novosRecordesPorCarga.push({ cargaKg: serie.cargaKg, reps: serie.reps, data: new Date(), sessaoId: novaSessaoRef.id });
                     prData.recordesPorCarga = novosRecordesPorCarga;
                 }
             });
@@ -210,20 +212,25 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
                 await updateDoc(prRef, { recordesPorCarga: prData.recordesPorCarga });
             }
         }
+        
         const mensagemMotivacional = gerarMensagemEngracada(maiorCargaNaSessao);
-        let finalMessage = `Sessão registrada com sucesso!\n\n${mensagemMotivacional}`;
+        showToast(mensagemMotivacional, 'success', 6000); // Mostra por 6 segundos
         if (prMessages.length > 0) {
-            finalMessage += "\n\n--- 🏆 RECORDES PESSOAIS ATINGIDOS ---";
-            prMessages.forEach(prMsg => { finalMessage += `\n${prMsg}`; });
+            prMessages.forEach((prMsg, index) => {
+                setTimeout(() => { showToast(prMsg, 'warning'); }, (index + 1) * 1500);
+            });
         }
-        alert(finalMessage);
-        navigate('/historico');
+        
+        setTimeout(() => {
+            navigate('/historico');
+        }, 1000 + (prMessages.length * 1500));
     } catch (error) {
-        console.error("Erro ao salvar ou verificar PRs:", error); alert("Falha ao salvar sessão: " + error.message);
+        console.error("Erro ao salvar ou verificar PRs:", error); 
+        showToast("Falha ao salvar sessão: " + error.message, 'danger');
     }
     setIsSubmittingSessao(false);
   };
-
+  
   if (loading) return <div className="text-center mt-5"><Spinner animation="border" /></div>;
   if (!planoAtivoInfo) return ( 
     <Container className="mt-4"><Alert variant="warning" className="text-center">
@@ -277,6 +284,11 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
                   </Card.Header>
                   {performanceAtual?.checkRealizado && (
                     <Card.Body>
+                      <small className="text-muted">
+                        Planejado: {exPrescrito.seriesAlvo} séries de {exPrescrito.repsAlvo} reps
+                        {exPrescrito.obsPlanejamento && ` | Obs: ${exPrescrito.obsPlanejamento}`}
+                      </small>
+                      <hr className="my-2"/>
                       {performanceAtual.series.map((serie, setIndex) => (
                         <Row key={setIndex} className="g-2 mb-2 align-items-center">
                           <Col xs="auto" className="fw-bold">{`Série ${serie.setNumero}`}</Col>
@@ -317,6 +329,8 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         )
       )}
       <div className="mt-4"><Link to="/"><Button variant='secondary'>Voltar ao Dashboard</Button></Link></div>
+      
+      <TimerDescanso />
     </>
   );
 };

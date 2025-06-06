@@ -4,6 +4,7 @@ import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; // serverTimestamp é uma boa prática
+import { useToast } from './context/ToastContext';
 
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
@@ -15,6 +16,7 @@ import Alert from 'react-bootstrap/Alert';
 
 const PaginaCadastro = () => {
   const [nome, setNome] = useState('');
+  const { showToast } = useToast(); 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
@@ -23,19 +25,17 @@ const PaginaCadastro = () => {
   const handleCadastro = async (e) => {
     e.preventDefault();
     setError('');
-    if (senha.length < 6) {
-        setError("A senha deve ter no mínimo 6 caracteres.");
-        return;
-    }
+    if (senha.length < 6) { setError("A senha deve ter no mínimo 6 caracteres."); return; }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const user = userCredential.user;
       await setDoc(doc(db, "usuarios", user.uid), {
         nome: nome,
         email: email,
-        dataCriacao: serverTimestamp() // Usando timestamp do servidor
+        dataCriacao: serverTimestamp()
       });
-      alert("Usuário cadastrado com sucesso!");
+      showToast("Usuário cadastrado com sucesso!", 'success'); // ALERTA SUBSTITUÍDO
       navigate('/');
     } catch (error) {
       console.error("Erro no cadastro:", error);
@@ -46,7 +46,7 @@ const PaginaCadastro = () => {
       }
     }
   };
-
+  
   return (
     <Container className="d-flex align-items-center justify-content-center" style={{ minHeight: '80vh' }}>
       <Row className="w-100">

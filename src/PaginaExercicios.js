@@ -1,4 +1,5 @@
 // src/PaginaExercicios.js
+
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { 
@@ -6,27 +7,26 @@ import {
 } from 'firebase/firestore';
 
 // Imports do React-Bootstrap
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import ListGroup from 'react-bootstrap/ListGroup';
-import Spinner from 'react-bootstrap/Spinner';
-import InputGroup from 'react-bootstrap/InputGroup'; // Para o modo de edição
+import { Row, Col, Card, Form, Button, ListGroup, Spinner, InputGroup } from 'react-bootstrap';
+
+// 1. IMPORTAR O HOOK 'useToast'
+import { useToast } from './context/ToastContext';
 
 const PaginaExercicios = ({ usuario }) => {
+  // 2. PEGAR A FUNÇÃO 'showToast'
+  const { showToast } = useToast(); 
+
   const [nome, setNome] = useState('');
   const [grupoMuscular, setGrupoMuscular] = useState('Peito');
   const [tipo, setTipo] = useState('Composto');
   const [exercicios, setExercicios] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  
   const [editandoEx, setEditandoEx] = useState(null);
   const [novoNome, setNovoNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Buscar os exercícios (a lógica não muda)
+  // Buscar os exercícios
   useEffect(() => {
     if (!usuario) {
       setExercicios([]);
@@ -41,12 +41,13 @@ const PaginaExercicios = ({ usuario }) => {
       setLoading(false);
     }, (error) => {
       console.error("Erro ao buscar exercícios: ", error);
+      showToast("Erro ao buscar exercícios.", 'danger');
       setLoading(false);
     });
     return () => unsubscribe();
   }, [usuario]);
 
-  // Adicionar, Deletar, Atualizar (a lógica não muda)
+  // Adicionar um exercício
   const handleAddExercicio = async (e) => {
     e.preventDefault();
     if (!nome.trim() || !usuario) return;
@@ -58,34 +59,42 @@ const PaginaExercicios = ({ usuario }) => {
         tipo: tipo,
         userId: usuario.uid,
       });
+      showToast("Exercício adicionado com sucesso!", 'success'); // ALERTA SUBSTITUÍDO
       setNome('');
       setGrupoMuscular('Peito');
       setTipo('Composto');
     } catch (error) {
       console.error("Erro ao adicionar exercício: ", error);
+      showToast("Erro ao adicionar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
     }
     setIsSubmitting(false);
   };
 
+  // Deletar um exercício
   const handleDeleteExercicio = async (id) => {
-    if (window.confirm("Tem certeza que deseja deletar este exercício?")) {
+    if (window.confirm("Tem certeza que deseja deletar este exercício?")) { // Mantemos o confirm por segurança
       try {
         await deleteDoc(doc(db, 'exercicios', id));
+        showToast("Exercício deletado.", 'info'); // ALERTA SUBSTITUÍDO
       } catch (error) {
         console.error("Erro ao deletar exercício: ", error);
+        showToast("Erro ao deletar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
       }
     }
   };
 
+  // Atualizar um exercício
   const handleUpdateExercicio = async (id) => {
     if (!novoNome.trim()) return;
     try {
       const exDocRef = doc(db, 'exercicios', id);
       await updateDoc(exDocRef, { nome: novoNome.trim() });
+      showToast("Exercício atualizado com sucesso!", 'success'); // ALERTA SUBSTITUÍDO
       setEditandoEx(null);
       setNovoNome('');
     } catch (error) {
       console.error("Erro ao atualizar exercício: ", error);
+      showToast("Erro ao atualizar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
     }
   };
 

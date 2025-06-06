@@ -6,6 +6,7 @@ import {
   collection, addDoc, query, where, onSnapshot, serverTimestamp, 
   writeBatch, getDocs, doc, orderBy 
 } from 'firebase/firestore';
+import { useToast } from './context/ToastContext'; // Importar
 
 // Imports do React-Bootstrap
 import Row from 'react-bootstrap/Row';
@@ -19,6 +20,7 @@ import Spinner from 'react-bootstrap/Spinner'; // Para um loading mais elegante
 const PaginaMeusPlanos = ({ usuario }) => {
   const [planos, setPlanos] = useState([]);
   const [loadingPlanos, setLoadingPlanos] = useState(true);
+  const { showToast } = useToast();
 
   // Estados do formulário
   const [nomePlano, setNomePlano] = useState('');
@@ -45,11 +47,11 @@ const PaginaMeusPlanos = ({ usuario }) => {
   const handleAddPlano = async (e) => {
     e.preventDefault();
     if (!nomePlano.trim() || !dataInicio || !totalSemanasCiclo) {
-      alert("Por favor, preencha todos os campos obrigatórios.");
+      showToast("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
     if (parseInt(totalSemanasCiclo) <= 0) {
-      alert("O total de semanas deve ser maior que zero.");
+      showToast("O total de semanas deve ser maior que zero.");
       return;
     }
     setIsSubmitting(true);
@@ -74,11 +76,11 @@ const PaginaMeusPlanos = ({ usuario }) => {
       const novoPlanoRef = doc(planosColRef);
       batch.set(novoPlanoRef, novoPlanoData);
       await batch.commit();
-      alert("Plano de treino adicionado com sucesso!");
+      showToast("Plano de treino adicionado com sucesso!");
       setNomePlano(''); setDataInicio(''); setTotalSemanasCiclo(12); setAtivo(true);
     } catch (error) {
       console.error("Erro ao adicionar plano: ", error);
-      alert("Falha ao adicionar plano: " + error.message);
+      showToast("Falha ao adicionar plano: " + error.message);
     }
     setIsSubmitting(false);
   };
