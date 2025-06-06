@@ -1,17 +1,18 @@
 // src/PaginaRegistrarProgresso.js
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { db, auth } from './firebase';
+import { db } from './firebase'; // 'auth' não é mais necessário aqui, pois 'usuario' vem via prop
 import { 
-    collection, query, where, getDocs, orderBy, doc, onSnapshot, addDoc, serverTimestamp, setDoc, getDoc, arrayUnion, arrayRemove, updateDoc
+    collection, query, where, getDocs, orderBy, doc, onSnapshot, addDoc, serverTimestamp, setDoc, getDoc, updateDoc
 } from 'firebase/firestore';
 import { gerarMensagemEngracada } from './utils/mensagensMotivacionais';
+import { useToast } from './context/ToastContext'; // 1. IMPORTAÇÃO DO useToast
 import { Form, Button, Row, Col, Card, Spinner, Alert, InputGroup, Container } from 'react-bootstrap';
 import TimerDescanso from './components/TimerDescanso';
-import { useToast } from './context/ToastContext'; // 1. IMPORTAR O HOOK useToast
 
 const PaginaRegistrarProgresso = ({ usuario }) => {
-  const { showToast } = useToast(); // 2. PEGAR A FUNÇÃO showToast
+  const { showToast } = useToast(); // 2. DECLARAÇÃO DO HOOK
   const navigate = useNavigate();
 
   const [planoAtivoInfo, setPlanoAtivoInfo] = useState(null);
@@ -29,20 +30,28 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
 
   // Efeito principal para carregar dados do plano e grupos
   useEffect(() => {
-    if (!usuario) { setLoading(false); return; }
+    if (!usuario) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const carregarDadosIniciais = async () => {
       try {
         const planosRef = collection(db, 'usuarios', usuario.uid, 'planosDeTreino');
         const qPlanos = query(planosRef, where("ativo", "==", true));
         const planosSnapshot = await getDocs(qPlanos);
+
         if (planosSnapshot.empty) {
-          setPlanoAtivoInfo(null); setLoading(false); return;
+          setPlanoAtivoInfo(null);
+          setLoading(false);
+          return;
         }
+        
         const planoAtivoDoc = planosSnapshot.docs[0];
         const planoData = planoAtivoDoc.data();
         const planoId = planoAtivoDoc.id;
         setPlanoAtivoInfo({ id: planoId, ...planoData });
+
         if (planoData.dataInicio && planoData.totalSemanasCiclo) {
             const dataInicioPlano = planoData.dataInicio.toDate();
             const hoje = new Date();
@@ -52,11 +61,14 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
             semanaAtualSugerida = Math.max(1, Math.min(semanaAtualSugerida, planoData.totalSemanasCiclo));
             setSemanaCicloSelecionada(semanaAtualSugerida);
         }
+
         const gruposRef = collection(db, 'usuarios', usuario.uid, 'planosDeTreino', planoId, 'definicaoGruposTreino');
         const qGrupos = query(gruposRef, orderBy("ordem", "asc"));
         const gruposSnapshot = await getDocs(qGrupos);
+        
         const listaGrupos = gruposSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
         setGruposDoPlano(listaGrupos);
+
         if (listaGrupos.length > 0) {
           setGrupoSelecionadoId(listaGrupos[0].id);
         } else {
@@ -64,14 +76,13 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         }
       } catch (error) {
         console.error("Erro ao carregar dados da página:", error);
-        showToast("Erro ao carregar dados do plano.", 'danger');
         setPlanoAtivoInfo(null);
       } finally {
         setLoading(false);
       }
     };
     carregarDadosIniciais();
-  }, [usuario, showToast]);
+  }, [usuario]);
 
   // Efeito para buscar exercícios e inicializar estado para MÚLTIPLAS SÉRIES
   useEffect(() => {
@@ -140,7 +151,7 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
       novosDados[keyId].series = novasSeries.map((s, index) => ({ ...s, setNumero: index + 1 }));
       setDadosPerformados(novosDados);
     } else {
-      showToast("É necessário registrar pelo menos uma série.", 'warning'); // ALERTA SUBSTITUÍDO
+      showToast("É necessário registrar pelo menos uma série.", 'warning');
     }
   };
 
@@ -171,7 +182,7 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
     }).filter(item => item.series.length > 0);
 
     if (exerciciosPerformadosParaSalvar.length === 0) {
-        showToast("Nenhum exercício foi marcado como realizado ou teve séries válidas preenchidas.", 'warning'); 
+        showToast("Nenhum exercício foi marcado como realizado ou teve séries válidas preenchidas.", 'warning');
         setIsSubmittingSessao(false); return;
     }
     try {
@@ -186,8 +197,10 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         let prMessages = [];
         for (const exPerfSalvo of exerciciosPerformadosParaSalvar) {
             const prRef = doc(db, 'usuarios', usuario.uid, 'recordesPessoais', exPerfSalvo.exercicioBaseId);
-            const prDoc = await getDoc(prRef); const prData = prDoc.exists() ? prDoc.data() : { maiorCargaKg: 0, recordesPorCarga: [] };
+            const prDoc = await getDoc(prRef); 
+            const prData = prDoc.exists() ? prDoc.data() : { maiorCargaKg: 0, recordesPorCarga: [] };
             let novoPrDeCarga = false;
+
             exPerfSalvo.series.forEach(serie => {
                 if (serie.cargaKg > prData.maiorCargaKg) {
                     prData.maiorCargaKg = serie.cargaKg; novoPrDeCarga = true;
@@ -201,6 +214,7 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
                     prData.recordesPorCarga = novosRecordesPorCarga;
                 }
             });
+            
             if (novoPrDeCarga) {
                 prMessages.unshift(`NOVO PR de Carga para ${exPerfSalvo.nomeExercicioSnapshot}: ${prData.maiorCargaKg} kg! 🚀`);
                 await setDoc(prRef, { 
@@ -212,9 +226,9 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
                 await updateDoc(prRef, { recordesPorCarga: prData.recordesPorCarga });
             }
         }
-        
+
         const mensagemMotivacional = gerarMensagemEngracada(maiorCargaNaSessao);
-        showToast(mensagemMotivacional, 'success', 6000); // Mostra por 6 segundos
+        showToast(mensagemMotivacional, 'success', 6000);
         if (prMessages.length > 0) {
             prMessages.forEach((prMsg, index) => {
                 setTimeout(() => { showToast(prMsg, 'warning'); }, (index + 1) * 1500);
@@ -329,7 +343,6 @@ const PaginaRegistrarProgresso = ({ usuario }) => {
         )
       )}
       <div className="mt-4"><Link to="/"><Button variant='secondary'>Voltar ao Dashboard</Button></Link></div>
-      
       <TimerDescanso />
     </>
   );

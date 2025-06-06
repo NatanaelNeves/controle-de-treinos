@@ -1,32 +1,25 @@
 // src/PaginaExercicios.js
-
 import React, { useState, useEffect } from 'react';
-import { db, auth } from './firebase';
+import { db } from './firebase'; // auth removido pois 'usuario' vem como prop
 import { 
     collection, addDoc, onSnapshot, query, where, doc, deleteDoc, updateDoc, orderBy 
 } from 'firebase/firestore';
+import { useToast } from './context/ToastContext'; // Importar o Toast
 
 // Imports do React-Bootstrap
 import { Row, Col, Card, Form, Button, ListGroup, Spinner, InputGroup } from 'react-bootstrap';
 
-// 1. IMPORTAR O HOOK 'useToast'
-import { useToast } from './context/ToastContext';
-
 const PaginaExercicios = ({ usuario }) => {
-  // 2. PEGAR A FUNÇÃO 'showToast'
-  const { showToast } = useToast(); 
-
+  const { showToast } = useToast(); // Usar o Toast
   const [nome, setNome] = useState('');
   const [grupoMuscular, setGrupoMuscular] = useState('Peito');
   const [tipo, setTipo] = useState('Composto');
   const [exercicios, setExercicios] = useState([]);
   const [loading, setLoading] = useState(true);
-  
   const [editandoEx, setEditandoEx] = useState(null);
   const [novoNome, setNovoNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Buscar os exercícios
   useEffect(() => {
     if (!usuario) {
       setExercicios([]);
@@ -41,13 +34,12 @@ const PaginaExercicios = ({ usuario }) => {
       setLoading(false);
     }, (error) => {
       console.error("Erro ao buscar exercícios: ", error);
-      showToast("Erro ao buscar exercícios.", 'danger');
+      showToast('Erro ao buscar exercícios.', 'danger');
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [usuario]);
+  }, [usuario, showToast]); // Adicionado showToast às dependências
 
-  // Adicionar um exercício
   const handleAddExercicio = async (e) => {
     e.preventDefault();
     if (!nome.trim() || !usuario) return;
@@ -59,42 +51,38 @@ const PaginaExercicios = ({ usuario }) => {
         tipo: tipo,
         userId: usuario.uid,
       });
-      showToast("Exercício adicionado com sucesso!", 'success'); // ALERTA SUBSTITUÍDO
-      setNome('');
-      setGrupoMuscular('Peito');
-      setTipo('Composto');
+      showToast("Exercício adicionado com sucesso!", 'success');
+      setNome(''); setGrupoMuscular('Peito'); setTipo('Composto');
     } catch (error) {
       console.error("Erro ao adicionar exercício: ", error);
-      showToast("Erro ao adicionar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
+      showToast("Erro ao adicionar exercício: " + error.message, 'danger');
     }
     setIsSubmitting(false);
   };
 
-  // Deletar um exercício
   const handleDeleteExercicio = async (id) => {
-    if (window.confirm("Tem certeza que deseja deletar este exercício?")) { // Mantemos o confirm por segurança
+    if (window.confirm("Tem certeza que deseja deletar este exercício?")) {
       try {
         await deleteDoc(doc(db, 'exercicios', id));
-        showToast("Exercício deletado.", 'info'); // ALERTA SUBSTITUÍDO
+        showToast("Exercício deletado.", 'info');
       } catch (error) {
         console.error("Erro ao deletar exercício: ", error);
-        showToast("Erro ao deletar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
+        showToast("Erro ao deletar exercício: " + error.message, 'danger');
       }
     }
   };
 
-  // Atualizar um exercício
   const handleUpdateExercicio = async (id) => {
     if (!novoNome.trim()) return;
     try {
       const exDocRef = doc(db, 'exercicios', id);
       await updateDoc(exDocRef, { nome: novoNome.trim() });
-      showToast("Exercício atualizado com sucesso!", 'success'); // ALERTA SUBSTITUÍDO
+      showToast("Exercício atualizado!", 'success');
       setEditandoEx(null);
       setNovoNome('');
     } catch (error) {
       console.error("Erro ao atualizar exercício: ", error);
-      showToast("Erro ao atualizar exercício: " + error.message, 'danger'); // ALERTA SUBSTITUÍDO
+      showToast("Erro ao atualizar exercício: " + error.message, 'danger');
     }
   };
 
@@ -102,7 +90,6 @@ const PaginaExercicios = ({ usuario }) => {
     <>
       <h2 className="mb-4">Minha Biblioteca de Exercícios</h2>
       <Row>
-        {/* Coluna do Formulário */}
         <Col md={5} lg={4} className="mb-4 mb-md-0">
           <Card data-bs-theme="dark">
             <Card.Body>
@@ -144,8 +131,6 @@ const PaginaExercicios = ({ usuario }) => {
             </Card.Body>
           </Card>
         </Col>
-
-        {/* Coluna da Lista de Exercícios */}
         <Col md={7} lg={8}>
           <Card data-bs-theme="dark">
             <Card.Header as="h3">Exercícios Cadastrados ({exercicios.length})</Card.Header>
@@ -160,12 +145,7 @@ const PaginaExercicios = ({ usuario }) => {
                     <ListGroup.Item key={ex.id}>
                       {editandoEx === ex.id ? (
                         <InputGroup>
-                          <Form.Control 
-                            type="text" 
-                            value={novoNome} 
-                            onChange={(e) => setNovoNome(e.target.value)}
-                            autoFocus
-                          />
+                          <Form.Control type="text" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} autoFocus />
                           <Button variant="success" onClick={() => handleUpdateExercicio(ex.id)}>Salvar</Button>
                           <Button variant="outline-secondary" onClick={() => setEditandoEx(null)}>Cancelar</Button>
                         </InputGroup>
@@ -197,4 +177,4 @@ const PaginaExercicios = ({ usuario }) => {
   );
 };
 
-export default PaginaExercicios;
+export default PaginaExercicios; // Esta linha PRECISA ser a última, fora da função do componente
